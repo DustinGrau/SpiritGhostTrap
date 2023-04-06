@@ -13,11 +13,13 @@
 import adafruit_dotstar
 import audioio
 import board
+import neopixel
 import time
 from adafruit_motor import servo
 from audiocore import WaveFile
 from digitalio import DigitalInOut, Direction, Pull
 from pwmio import PWMOut
+from rainbowio import colorwheel
 
 try:
     from audioio import AudioOut
@@ -37,6 +39,21 @@ doorAngle = 110
 
 # Configure the DotStar LED
 dot_led = adafruit_dotstar.DotStar(board.APA102_SCK, board.APA102_MOSI, 1)
+
+# Configure NeoPixels for effects on A1
+pixel_pin = board.A1
+num_pixels = 16
+pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.9, auto_write=False)
+
+# Create color constants
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+YELLOW = (255, 150, 0)
+GREEN = (0, 255, 0)
+CYAN = (0, 255, 255)
+BLUE = (0, 0, 255)
+PURPLE = (180, 0, 255)
 
 # Configure a pushbutton on pin D0
 btnTaunt = DigitalInOut(board.D0)
@@ -69,9 +86,6 @@ ledBar2 = PWMOut(board.D11, frequency=400, duty_cycle=0)
 ledBar3 = PWMOut(board.D12, frequency=400, duty_cycle=0)
 ledBar = [ledBar1, ledBar2, ledBar3]
 
-# Configure the main white LED using PWM
-ledWhite = PWMOut(board.D5, frequency=400, duty_cycle=0)
-
 # Create the L/R servo objects
 servoLeft = servo.Servo(pwm1, min_pulse = 750, max_pulse = 2500)
 servoRight = servo.Servo(pwm2, min_pulse = 750, max_pulse = 2500)
@@ -91,8 +105,9 @@ def reset_LEDs():
     ledBar2.duty_cycle = pwrOff
     ledBar3.duty_cycle = pwrOff
 
-    # Turn off the white LED
-    ledWhite.duty_cycle = pwrOff
+    # Turn off the NeoPixels
+    pixels.fill(BLACK)
+    pixels.show()
 
 # Define a process for building up the bar graph on a loop
 def idle_state():
@@ -149,8 +164,9 @@ def do_taunt_sequence():
     ledBar2.duty_cycle = pwrFull
     ledBar3.duty_cycle = pwrFull
 
-    # Turn on the white LED
-    ledWhite.duty_cycle = pwrFull
+    # Turn on the NeoPixels solid white
+    pixels.fill(WHITE)
+    pixels.show()
 
     # Start the SFX
     audio.play(taunt_seq_sfx)
@@ -189,9 +205,10 @@ def open_trap_sequence():
         print("Doors Opening")
         open_doors()
 
-        # Turn on the main lights
-        print("Lights On")
-        ledWhite.duty_cycle = pwrFull
+        # Turn on the NeoPixels
+        print("Pixels On")
+        pixels.fill(WHITE)
+        pixels.show()
 
         # Wait for the end sequence portion of the audio
         time.sleep(7.54)
@@ -213,10 +230,13 @@ def close_trap_sequence():
     # Shut down the laser
     relay.value = False
 
-    # Turn off the main lights
+    # Delay before lighting effects
     time.sleep(0.4)
-    print("Lights Off")
-    ledWhite.duty_cycle = pwrOff
+
+    # Turn off the NeoPixels
+    print("Pixels Off")
+    pixels.fill(BLACK)
+    pixels.show()
 
     # Build the bar graph left to right, quickly
     print("Bar Graph Build")
