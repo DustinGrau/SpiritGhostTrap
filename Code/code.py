@@ -10,7 +10,6 @@
 # Indicator   = D9
 # Bar Graph   = D10/D11/D12 (Gnd + 220ohm)
 #
-import adafruit_dotstar
 import audioio
 import board
 import neopixel
@@ -37,10 +36,7 @@ pwrOff = 0
 # Set a common value for the necessary servo movement (0-N)
 doorAngle = 110
 
-# Configure the DotStar LED
-dot_led = adafruit_dotstar.DotStar(board.APA102_SCK, board.APA102_MOSI, 1)
-
-# Configure NeoPixels for effects on A1
+# Configure NeoPixels (ring) for effects on A1
 pixel_pin = board.A1
 num_pixels = 16
 pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.9, auto_write=False)
@@ -111,14 +107,11 @@ def reset_LEDs():
 
 # Define a process for building up the bar graph on a loop
 def idle_state():
-    # Set the DotStar LED to green
-    dot_led[0] = (0, 60, 0)
-
     # Set a constant sleep time
     sleepTime = 0.6
 
     # Build the bar graph left to right, repeat
-    for led in range(0, 3):
+    for led in range(3):
         # On each increment of bar graph, check if buttons were pressed and exit
         if btnStart.value or btnTaunt.value or btnOpen.value:
             return
@@ -152,9 +145,6 @@ def open_doors():
 
 # Steady blink with sound
 def do_taunt_sequence():
-    # Set the DotStar LED to blue
-    dot_led[0] = (0, 0, 60)
-
     # Turn off all external LED's
     reset_LEDs()
 
@@ -172,7 +162,7 @@ def do_taunt_sequence():
     audio.play(taunt_seq_sfx)
 
     # Blink the indicator 12 times
-    for count in range(0, 12):
+    for count in range(12):
         # Blink the Trap-OK indicator at a rate of ~0.5s
         print("Blink:", count)
         # We need this illuminated longer than we need it off
@@ -187,9 +177,6 @@ def do_taunt_sequence():
 
 # Run the full trap sequence with audio and SFX
 def open_trap_sequence():
-    # Set the DotStar LED to red
-    dot_led[0] = (60, 0, 0)
-
     # Turn off all external LED's
     reset_LEDs()
 
@@ -205,22 +192,28 @@ def open_trap_sequence():
         print("Doors Opening")
         open_doors()
 
-        # Turn on the NeoPixels
+        # Wait for doors to open
+        time.sleep(1.54)
+
+        # Flash the NeoPixels
         print("Pixels On")
-        pixels.fill(WHITE)
-        pixels.show()
+        for count in range(50):
+            pixels.fill(BLACK)
+            pixels.show()
+            time.sleep(0.05)
+            pixels.fill(WHITE)
+            pixels.show()
+            time.sleep(0.05)
 
         # Wait for the end sequence portion of the audio
-        time.sleep(7.54)
+        # Some of the delay is built into the actions above
+        time.sleep(0.8)
 
         # Do the capture-complete sequence
         close_trap_sequence()
 
 # End the sequence by shutting everything down
 def close_trap_sequence():
-    # Set the DotStar LED to blue
-    dot_led[0] = (0, 0, 60)
-
     # Open the trap doors via servos
     print("Doors Closing")
     close_doors()
@@ -249,7 +242,7 @@ def close_trap_sequence():
     time.sleep(0.1)
 
     # Blink the indicator 22 times
-    for count in range(0, 22):
+    for count in range(22):
         # Blink the Trap-OK indicator at a rate of ~0.325s
         print("Blink:", count)
         # We need this illuminated longer than we need it off
@@ -270,6 +263,9 @@ def close_trap_sequence():
 
 # Make sure the door servos are set to their closed position.
 close_doors()
+
+# Make sure all LED's start in an off state.
+reset_LEDs()
 
 # Start the main loop after booting
 while True:
