@@ -14,11 +14,11 @@ import audioio
 import board
 import neopixel
 import time
+from adafruit_led_animation.color import BLACK, WHITE
 from adafruit_motor import servo
 from audiocore import WaveFile
 from digitalio import DigitalInOut, Direction, Pull
 from pwmio import PWMOut
-from rainbowio import colorwheel
 
 try:
     from audioio import AudioOut
@@ -37,19 +37,11 @@ pwrOff = 0
 doorAngle = 110
 
 # Configure NeoPixels (ring) for effects on A1
-pixel_pin = board.A1
-num_pixels = 16
-pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.9, auto_write=False)
-
-# Create color constants
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-YELLOW = (255, 150, 0)
-GREEN = (0, 255, 0)
-CYAN = (0, 255, 255)
-BLUE = (0, 0, 255)
-PURPLE = (180, 0, 255)
+pixelPin = board.A1
+pixelCount = 16
+pixelRing = neopixel.NeoPixel(pixelPin, pixelCount, brightness=1, auto_write=False)
+pixelRing.fill(BLACK)
+pixelRing.show()
 
 # Configure a pushbutton on pin D0
 btnTaunt = DigitalInOut(board.D0)
@@ -77,10 +69,31 @@ ledOK = DigitalInOut(board.D9)
 ledOK.direction = Direction.OUTPUT
 
 # Configure the bar graph LED's using PWM
-ledBar1 = PWMOut(board.D10, frequency=400, duty_cycle=0)
-ledBar2 = PWMOut(board.D11, frequency=400, duty_cycle=0)
-ledBar3 = PWMOut(board.D12, frequency=400, duty_cycle=0)
-ledBar = [ledBar1, ledBar2, ledBar3]
+BAR_GRAPH = [
+    {
+        "NAME": "BG1",
+        "ON": 3.0,
+        "OFF": 1.0,
+        "PREV_TIME": -1,
+        "PIN": board.D10,
+    },
+    {
+        "NAME": "BG2",
+        "ON": 2.0,
+        "OFF": 2.0,
+        "PREV_TIME": -1,
+        "PIN": board.D11,
+    },
+    {
+        "NAME": "BG3",
+        "ON": 1.0,
+        "OFF": 3.0,
+        "PREV_TIME": -1,
+        "PIN": board.D12,
+    }
+]
+for led in BAR_GRAPH:
+    led["PIN"] = PWMOut(led["PIN"], frequency=400, duty_cycle=0)
 
 # Create the L/R servo objects
 servoLeft = servo.Servo(pwm1, min_pulse = 750, max_pulse = 2500)
@@ -94,32 +107,32 @@ taunt_seq_wav = open("trap_beeps_12.wav", "rb")
 taunt_seq_sfx = WaveFile(taunt_seq_wav)
 audio = AudioOut(board.A0)
 
-# Turn off all LED's
-def reset_LEDs():
-    # Turn off bar graph
-    ledBar1.duty_cycle = pwrOff
-    ledBar2.duty_cycle = pwrOff
-    ledBar3.duty_cycle = pwrOff
+# Turn off and reset the bar graph LED's
+def bar_graph_off():
+    for led in BAR_GRAPH:
+        led["PIN"].duty_cycle = pwrOff
+        led["PREV_TIME"] = -1
 
 # Define a process for building up the bar graph on a loop
 def idle_state():
-    # Set a constant sleep time
-    sleepTime = 0.6
+    # Store the current time to refer to later.
+    now = time.monotonic()
 
-    # Build the bar graph left to right, repeat
-    for led in range(3):
-        # On each increment of bar graph, check if buttons were pressed and exit
-        if btnStart.value or btnTaunt.value or btnOpen.value:
-            return
-        print(led+1)
-        ledBar[led].duty_cycle = pwrFull
-        time.sleep(sleepTime)
+    for led in BAR_GRAPH:
+        if led["PREV_TIME"] == -1:
+            led["PREV_TIME"] = now
 
-        if led == 2:
-            ledBar1.duty_cycle = pwrOff
-            ledBar2.duty_cycle = pwrOff
-            ledBar3.duty_cycle = pwrOff
-            time.sleep(sleepTime)
+    for led in BAR_GRAPH:
+        if led["PIN"].duty_cycle == pwrOff:
+            if now >= led["PREV_TIME"] + led["OFF"]:
+                led["PREV_TIME"] = now
+                led["PIN"].duty_cycle = pwrFull
+                print(led["NAME"], "ON")
+        if led["PIN"].duty_cycle == pwrFull:
+            if now >= led["PREV_TIME"] + led["ON"]:
+                led["PREV_TIME"] = now
+                led["PIN"].duty_cycle = pwrOff
+                print(led["NAME"], "OFF")
 
 # Just close the doors
 def close_doors():
@@ -141,18 +154,17 @@ def open_doors():
 
 # Steady blink with sound
 def do_taunt_sequence():
-    # Turn off all external LED's
-    reset_LEDs()
+    # Turn off all bar graph LED's
+    bar_graph_off()
 
     # Turn on the full bar graph
     print("Bar Graph Full")
-    ledBar1.duty_cycle = pwrFull
-    ledBar2.duty_cycle = pwrFull
-    ledBar3.duty_cycle = pwrFull
+    for led in BAR_GRAPH:
+        led["PIN"].duty_cycle = pwrFull
 
     # Turn on the NeoPixels solid white
-    pixels.fill(WHITE)
-    pixels.show()
+    pixelRing.fill(WHITE)
+    pixelRing.show()
 
     # Start the SFX
     audio.play(taunt_seq_sfx)
@@ -168,13 +180,17 @@ def do_taunt_sequence():
         ledOK.value = False
         time.sleep(0.085)
 
-    # Turn off all external LED's
-    reset_LEDs()
+    # Turn off all bar graph LED's
+    bar_graph_off()
+
+    # Turn off the NeoPixels
+    pixelRing.fill(BLACK)
+    pixelRing.show()
 
 # Run the full trap sequence with audio and SFX
 def open_trap_sequence():
-    # Turn off all external LED's
-    reset_LEDs()
+    # Turn off all bar graph LED's
+    bar_graph_off()
 
     # Start the SFX
     audio.play(trap_seq_sfx)
@@ -194,11 +210,11 @@ def open_trap_sequence():
         # Flash the NeoPixels
         print("Strobe Start")
         for count in range(60):
-            pixels.fill(BLACK)
-            pixels.show()
+            pixelRing.fill(BLACK)
+            pixelRing.show()
             time.sleep(0.05)
-            pixels.fill(WHITE)
-            pixels.show()
+            pixelRing.fill(WHITE)
+            pixelRing.show()
             time.sleep(0.05)
 
         # Do the capture-complete sequence
@@ -220,17 +236,17 @@ def close_trap_sequence():
 
     # Turn off the NeoPixels
     print("Pixels Off")
-    pixels.fill(BLACK)
-    pixels.show()
+    pixelRing.fill(BLACK)
+    pixelRing.show()
 
     # Build the bar graph left to right, quickly
     print("Bar Graph Build")
     time.sleep(0.1)
-    ledBar1.duty_cycle = pwrFull
+    BAR_GRAPH[0]["PIN"].duty_cycle = pwrFull
     time.sleep(0.3)
-    ledBar2.duty_cycle = pwrFull
+    BAR_GRAPH[1]["PIN"].duty_cycle = pwrFull
     time.sleep(0.3)
-    ledBar3.duty_cycle = pwrFull
+    BAR_GRAPH[2]["PIN"].duty_cycle = pwrFull
     time.sleep(0.1)
 
     # Blink the indicator 22 times
@@ -246,9 +262,7 @@ def close_trap_sequence():
 
     # Reset all indicator lights
     time.sleep(1)
-    ledBar1.duty_cycle = pwrOff
-    ledBar2.duty_cycle = pwrOff
-    ledBar3.duty_cycle = pwrOff
+    bar_graph_off()
     ledOK.value = False
     time.sleep(1)
     print("Trap Done")
