@@ -101,10 +101,6 @@ def reset_LEDs():
     ledBar2.duty_cycle = pwrOff
     ledBar3.duty_cycle = pwrOff
 
-    # Turn off the NeoPixels
-    pixels.fill(BLACK)
-    pixels.show()
-
 # Define a process for building up the bar graph on a loop
 def idle_state():
     # Set a constant sleep time
@@ -193,21 +189,17 @@ def open_trap_sequence():
         open_doors()
 
         # Wait for doors to open
-        time.sleep(1.54)
+        time.sleep(1.48)
 
         # Flash the NeoPixels
-        print("Pixels On")
-        for count in range(50):
+        print("Strobe Start")
+        for count in range(60):
             pixels.fill(BLACK)
             pixels.show()
             time.sleep(0.05)
             pixels.fill(WHITE)
             pixels.show()
             time.sleep(0.05)
-
-        # Wait for the end sequence portion of the audio
-        # Some of the delay is built into the actions above
-        time.sleep(0.8)
 
         # Do the capture-complete sequence
         close_trap_sequence()
@@ -223,7 +215,7 @@ def close_trap_sequence():
     # Shut down the laser
     relay.value = False
 
-    # Delay before lighting effects
+    # Delay before turning off lights
     time.sleep(0.4)
 
     # Turn off the NeoPixels
@@ -263,9 +255,6 @@ def close_trap_sequence():
 
 # Make sure the door servos are set to their closed position.
 close_doors()
-
-# Make sure all LED's start in an off state.
-reset_LEDs()
 
 # Start the main loop after booting
 while True:
