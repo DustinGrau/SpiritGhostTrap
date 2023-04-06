@@ -14,7 +14,7 @@ import audioio
 import board
 import neopixel
 import time
-from adafruit_led_animation.color import BLACK, WHITE
+from adafruit_led_animation.color import BLACK, GREEN, WHITE
 from adafruit_motor import servo
 from audiocore import WaveFile
 from digitalio import DigitalInOut, Direction, Pull
@@ -167,7 +167,10 @@ def do_taunt_sequence():
     pixelRing.show()
 
     # Start the SFX
-    audio.play(taunt_seq_sfx)
+    try:
+        audio.play(taunt_seq_sfx)
+    except Exception:
+        print("Could not play audio")
 
     # Blink the indicator 12 times
     for count in range(12):
@@ -193,7 +196,10 @@ def open_trap_sequence():
     bar_graph_off()
 
     # Start the SFX
-    audio.play(trap_seq_sfx)
+    try:
+        audio.play(trap_seq_sfx)
+    except Exception:
+        print("Could not play audio")
 
     while audio.playing:
         # Trigger the laser relay
@@ -205,11 +211,18 @@ def open_trap_sequence():
         open_doors()
 
         # Wait for doors to open
-        time.sleep(1.48)
+        time.sleep(0.44)
+
+        # Start with a green effect
+        pixelRing.fill(GREEN)
+        pixelRing.show()
+
+        # Pause before "capture"
+        time.sleep(3)
 
         # Flash the NeoPixels
         print("Strobe Start")
-        for count in range(60):
+        for count in range(40):
             pixelRing.fill(BLACK)
             pixelRing.show()
             time.sleep(0.05)
